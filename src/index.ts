@@ -3,7 +3,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import micromatch from 'micromatch';
 import SVGCompiler from 'svg-baker';
-import Svgo, { Options as SvgoOptions } from 'svgo';
+import { optimize, OptimizedSvg, OptimizeOptions as SvgoOptions } from 'svgo';
 import { Plugin } from 'vite';
 
 const { stringify } = JSON;
@@ -17,25 +17,29 @@ export interface SvgSpriteOptions {
 export default (options?: SvgSpriteOptions) => {
   const svgCompiler = new SVGCompiler();
   const match = options?.include ?? '**.svg';
-  let svgo: Svgo | null;
-  if (options?.svgo !== false) {
-    svgo = new Svgo(options?.svgo === true ? {} : options?.svgo);
-  }
 
   const plugin: Plugin = {
     name: 'svg-sprite',
 
     async transform(src, filepath) {
-      if (!micromatch.isMatch(filepath, match, {
-        dot: true,
-      })) {
+      if (
+        !micromatch.isMatch(filepath, match, {
+          dot: true,
+        })
+      ) {
         return undefined;
       }
 
       let code = await fs.promises.readFile(filepath, 'utf-8');
       const { name } = p.parse(filepath);
-      if (svgo) {
-        code = (await svgo.optimize(code)).data;
+      if (options?.svgo !== false) {
+        const optimizedSvg = optimize(
+          code,
+          options?.svgo === true ? {} : options?.svgo,
+        ) as OptimizedSvg;
+        if (optimizedSvg.data) {
+          code = optimizedSvg.data;
+        }
       }
 
       let id = name;
